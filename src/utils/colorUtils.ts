@@ -69,8 +69,6 @@ export async function extractColors(file: File, colorCount: number = 8): Promise
 }
 
 function kMeansClustering(pixels: Uint8ClampedArray, k: number): ExtractedColor[] {
-  const pixelCount = pixels.length / 4;
-  
   // Collect pixel data, skipping transparent pixels
   const points: [number, number, number][] = [];
   for (let i = 0; i < pixels.length; i += 4) {

@@ -30,7 +30,7 @@ export interface ResizeOptions {
 }
 
 export interface ConversionOptions {
-  format: 'image/jpeg' | 'image/png' | 'image/webp';
+  format: string;
   quality: number;
 }
 
@@ -46,19 +46,47 @@ export interface SocialMediaPreset {
   platform: string;
   width: number;
   height: number;
-  icon: string;
 }
 
-export type ToolId = 'compressor' | 'converter' | 'resizer' | 'colors' | 'pdf-merge';
+export type ToolId =
+  | 'compressor'
+  | 'converter'
+  | 'resizer'
+  | 'colors'
+  | 'pdf-merge'
+  | 'qr-generator'
+  | 'hash'
+  | 'text-diff';
+
+export type ToolCategory = 'image' | 'document' | 'utility';
 
 export interface Tool {
   id: ToolId;
   name: string;
   description: string;
-  longDescription: string;
   icon: string;
-  color: string;
-  gradient: string;
   accepts: string;
   path: string;
+  category: ToolCategory;
+}
+
+export type ConversionCategory = 'image' | 'document' | 'data';
+
+export interface QROptions {
+  text: string;
+  size: number;
+  errorCorrection: 'L' | 'M' | 'Q' | 'H';
+  foreground: string;
+  background: string;
+}
+
+export interface HashResult {
+  algorithm: string;
+  hash: string;
+}
+
+export interface DiffLine {
+  type: 'added' | 'removed' | 'unchanged';
+  content: string;
+  lineNumber: number;
 }

@@ -11,7 +11,7 @@ export async function mergePdfs(files: File[]): Promise<Blob> {
   }
 
   const mergedBytes = await mergedPdf.save();
-  return new Blob([mergedBytes], { type: 'application/pdf' });
+  return new Blob([mergedBytes.buffer as ArrayBuffer], { type: 'application/pdf' });
 }
 
 export async function getPdfPageCount(file: File): Promise<number> {

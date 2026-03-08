@@ -1,6 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Download, Trash2, Lock, Unlock, Sparkles } from 'lucide-react';
+import { Download, Trash2, Lock, Unlock } from 'lucide-react';
 import ToolLayout from '../shared/ToolLayout';
 import DropZone from '../shared/DropZone';
 import { resizeImage, getImageDimensions } from '../../utils/imageUtils';
@@ -121,7 +120,6 @@ export default function ImageResizer() {
     <ToolLayout
       title="Image Resizer"
       description="Resize images to exact dimensions with smart presets for every social media platform."
-      gradient="from-violet-500 to-purple-600"
     >
       {!file ? (
         <DropZone
@@ -134,17 +132,20 @@ export default function ImageResizer() {
         <div className="space-y-6">
           {/* Image preview */}
           <div className="card overflow-hidden">
-            <div className="aspect-video bg-gray-50 dark:bg-black/20 flex items-center justify-center p-4">
+            <div className="aspect-video flex items-center justify-center p-4" style={{ backgroundColor: 'var(--color-bg-tertiary)' }}>
               <img
                 src={file.processedUrl || file.originalUrl}
                 alt={file.originalFile.name}
                 className="max-w-full max-h-full object-contain rounded-lg"
               />
             </div>
-            <div className="p-4 border-t border-gray-100 dark:border-white/5 flex items-center justify-between">
+            <div
+              className="p-4 flex items-center justify-between"
+              style={{ borderTopWidth: '1px', borderTopStyle: 'solid', borderTopColor: 'var(--color-border)' }}
+            >
               <div>
-                <p className="text-sm font-medium text-gray-900 dark:text-white">{file.originalFile.name}</p>
-                <p className="text-xs text-gray-400 mt-1">
+                <p className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>{file.originalFile.name}</p>
+                <p className="text-xs mt-1" style={{ color: 'var(--color-text-tertiary)' }}>
                   Original: {originalDimensions?.width} × {originalDimensions?.height} • {formatFileSize(file.originalSize)}
                   {file.processedSize && ` → ${formatFileSize(file.processedSize)}`}
                 </p>
@@ -157,12 +158,12 @@ export default function ImageResizer() {
 
           {/* Resize controls */}
           <div className="card p-6">
-            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4">
+            <h3 className="text-sm font-semibold mb-4" style={{ color: 'var(--color-text-secondary)' }}>
               Custom Dimensions
             </h3>
             <div className="flex items-center gap-4">
               <div className="flex-1">
-                <label className="block text-xs text-gray-500 mb-1">Width (px)</label>
+                <label className="block text-xs mb-1" style={{ color: 'var(--color-text-secondary)' }}>Width (px)</label>
                 <input
                   type="number"
                   value={width}
@@ -175,18 +176,18 @@ export default function ImageResizer() {
 
               <button
                 onClick={() => setMaintainAspectRatio(!maintainAspectRatio)}
-                className={`mt-5 p-3 rounded-xl transition-all ${
-                  maintainAspectRatio
-                    ? 'bg-violet-100 dark:bg-violet-500/20 text-violet-600 dark:text-violet-400'
-                    : 'bg-gray-100 dark:bg-white/10 text-gray-400'
-                }`}
+                className="mt-5 p-3 rounded-lg transition-all"
+                style={{
+                  backgroundColor: maintainAspectRatio ? 'var(--color-accent-muted)' : 'var(--color-bg-tertiary)',
+                  color: maintainAspectRatio ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
+                }}
                 title={maintainAspectRatio ? 'Aspect ratio locked' : 'Aspect ratio unlocked'}
               >
                 {maintainAspectRatio ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
               </button>
 
               <div className="flex-1">
-                <label className="block text-xs text-gray-500 mb-1">Height (px)</label>
+                <label className="block text-xs mb-1" style={{ color: 'var(--color-text-secondary)' }}>Height (px)</label>
                 <input
                   type="number"
                   value={height}
@@ -200,7 +201,6 @@ export default function ImageResizer() {
 
             <div className="mt-6 flex gap-3">
               <button onClick={processFile} disabled={isProcessing || width <= 0 || height <= 0} className="btn-primary">
-                <Sparkles className="w-4 h-4" />
                 {isProcessing ? 'Resizing...' : 'Resize Image'}
               </button>
               {file.processedBlob && (
@@ -214,30 +214,33 @@ export default function ImageResizer() {
 
           {/* Social media presets */}
           <div className="card p-6">
-            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4">
+            <h3 className="text-sm font-semibold mb-4" style={{ color: 'var(--color-text-secondary)' }}>
               Social Media Presets
             </h3>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
               {SOCIAL_MEDIA_PRESETS.map(preset => (
-                <motion.button
+                <button
                   key={preset.name}
                   onClick={() => applyPreset(preset.width, preset.height)}
-                  className={`p-3 rounded-xl text-left transition-all border
-                    ${width === preset.width && height === preset.height
-                      ? 'border-violet-500 bg-violet-50 dark:bg-violet-500/10'
-                      : 'border-gray-200 dark:border-white/10 hover:border-violet-300 dark:hover:border-violet-500/30'
-                    }`}
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
+                  className="p-3 rounded-lg text-left transition-all"
+                  style={{
+                    borderWidth: '1px',
+                    borderStyle: 'solid',
+                    borderColor: width === preset.width && height === preset.height
+                      ? 'var(--color-accent)'
+                      : 'var(--color-border)',
+                    backgroundColor: width === preset.width && height === preset.height
+                      ? 'var(--color-accent-muted)'
+                      : 'transparent',
+                  }}
                 >
-                  <span className="text-lg">{preset.icon}</span>
-                  <p className="text-xs font-semibold text-gray-700 dark:text-gray-300 mt-1">
+                  <p className="text-xs font-semibold" style={{ color: 'var(--color-text-secondary)' }}>
                     {preset.name}
                   </p>
-                  <p className="text-xs text-gray-400 font-mono">
+                  <p className="text-xs font-mono" style={{ color: 'var(--color-text-tertiary)' }}>
                     {preset.width}×{preset.height}
                   </p>
-                </motion.button>
+                </button>
               ))}
             </div>
           </div>

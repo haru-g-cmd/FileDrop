@@ -1,20 +1,50 @@
-import { useState, useCallback, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Download, Trash2, ArrowRight, Sparkles } from 'lucide-react';
+import { useState, useCallback, useEffect, useRef } from 'react';
+import { Download, Trash2, ArrowRight, FileText, Image, Database } from 'lucide-react';
 import ToolLayout from '../shared/ToolLayout';
 import DropZone from '../shared/DropZone';
 import { convertImage } from '../../utils/imageUtils';
 import { formatFileSize, downloadBlob, getOutputFilename, mimeToExtension, generateId } from '../../utils/fileUtils';
-import { FORMAT_OPTIONS } from '../../constants';
+import { IMAGE_FORMAT_OPTIONS } from '../../constants';
 import toast from 'react-hot-toast';
-import type { ProcessedFile, ConversionOptions } from '../../types';
+import type { ProcessedFile, ConversionCategory } from '../../types';
+
+type CategoryConfig = {
+  label: string;
+  icon: React.ReactNode;
+  description: string;
+};
+
+const CATEGORIES: Record<ConversionCategory, CategoryConfig> = {
+  image: { label: 'Images', icon: <Image className="w-4 h-4" />, description: 'Convert between image formats' },
+  document: { label: 'Documents', icon: <FileText className="w-4 h-4" />, description: 'PDF ↔ Images, DOCX → HTML' },
+  data: { label: 'Data', icon: <Database className="w-4 h-4" />, description: 'JSON ↔ CSV, Markdown → HTML' },
+};
+
+const DOC_CONVERSIONS = [
+  { id: 'img-to-pdf', label: 'Images → PDF', accept: 'image/jpeg,image/png,image/webp', multiple: true },
+  { id: 'pdf-to-img', label: 'PDF → Images', accept: 'application/pdf', multiple: false },
+  { id: 'docx-to-html', label: 'DOCX → HTML', accept: '.docx', multiple: false },
+];
+
+const DATA_CONVERSIONS = [
+  { id: 'json-to-csv', label: 'JSON → CSV', accept: '.json', inputLabel: 'Drop a JSON file' },
+  { id: 'csv-to-json', label: 'CSV → JSON', accept: '.csv', inputLabel: 'Drop a CSV file' },
+  { id: 'md-to-html', label: 'Markdown → HTML', accept: '.md,.markdown,.txt', inputLabel: 'Drop a Markdown file' },
+];
 
 export default function FormatConverter() {
+  const [category, setCategory] = useState<ConversionCategory>('image');
   const [files, setFiles] = useState<ProcessedFile[]>([]);
-  const [targetFormat, setTargetFormat] = useState<ConversionOptions['format']>('image/webp');
+  const [targetFormat, setTargetFormat] = useState('image/webp');
   const [quality, setQuality] = useState(92);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [docConversion, setDocConversion] = useState('img-to-pdf');
+  const [dataConversion, setDataConversion] = useState('json-to-csv');
+  const [dataResult, setDataResult] = useState<string | null>(null);
+  const [docResult, setDocResult] = useState<{ blobs: Blob[]; names: string[] } | null>(null);
+  const resultRef = useRef<HTMLTextAreaElement>(null);
 
+  // Image conversion handlers
   const handleFilesSelected = useCallback((newFiles: File[]) => {
     const processedFiles: ProcessedFile[] = newFiles.map(file => ({
       id: generateId(),
@@ -27,7 +57,7 @@ export default function FormatConverter() {
     setFiles(prev => [...prev, ...processedFiles]);
   }, []);
 
-  const processFiles = useCallback(async () => {
+  const processImageFiles = useCallback(async () => {
     setIsProcessing(true);
     const updatedFiles = [...files];
 
@@ -41,7 +71,6 @@ export default function FormatConverter() {
       try {
         const blob = await convertImage(file.originalFile, { format: targetFormat, quality });
         const processedUrl = URL.createObjectURL(blob);
-
         updatedFiles[i] = {
           ...file,
           status: 'done',
@@ -59,9 +88,64 @@ export default function FormatConverter() {
     setIsProcessing(false);
     const successCount = updatedFiles.filter(f => f.status === 'done').length;
     if (successCount > 0) {
-      toast.success(`${successCount} image${successCount > 1 ? 's' : ''} converted!`);
+      toast.success(`${successCount} file${successCount > 1 ? 's' : ''} converted`);
     }
   }, [files, targetFormat, quality]);
+
+  // Document conversion handlers
+  const processDocFiles = useCallback(async (inputFiles: File[]) => {
+    setIsProcessing(true);
+    try {
+      if (docConversion === 'img-to-pdf') {
+        const { imagesToPdf } = await import('../../utils/pdfImageUtils');
+        const blob = await imagesToPdf(inputFiles);
+        setDocResult({ blobs: [blob], names: ['converted.pdf'] });
+        toast.success('PDF created');
+      } else if (docConversion === 'pdf-to-img') {
+        const { pdfToImages } = await import('../../utils/pdfImageUtils');
+        const blobs = await pdfToImages(inputFiles[0]);
+        const names = blobs.map((_, i) => `page-${i + 1}.png`);
+        setDocResult({ blobs, names });
+        toast.success(`${blobs.length} page${blobs.length > 1 ? 's' : ''} extracted`);
+      } else if (docConversion === 'docx-to-html') {
+        const mammoth = await import('mammoth');
+        const arrayBuffer = await inputFiles[0].arrayBuffer();
+        const result = await mammoth.convertToHtml({ arrayBuffer });
+        const blob = new Blob([result.value], { type: 'text/html' });
+        setDocResult({ blobs: [blob], names: [getOutputFilename(inputFiles[0].name, '', '.html')] });
+        toast.success('DOCX converted to HTML');
+      }
+    } catch (err) {
+      toast.error('Conversion failed');
+      console.error(err);
+    }
+    setIsProcessing(false);
+  }, [docConversion]);
+
+  // Data conversion handlers
+  const processDataFile = useCallback(async (inputFiles: File[]) => {
+    setIsProcessing(true);
+    try {
+      const text = await inputFiles[0].text();
+      const { jsonToCsv, csvToJson, markdownToHtml } = await import('../../utils/dataFormatUtils');
+
+      if (dataConversion === 'json-to-csv') {
+        const data = JSON.parse(text);
+        const arr = Array.isArray(data) ? data : [data];
+        setDataResult(jsonToCsv(arr));
+      } else if (dataConversion === 'csv-to-json') {
+        const result = csvToJson(text);
+        setDataResult(JSON.stringify(result, null, 2));
+      } else if (dataConversion === 'md-to-html') {
+        setDataResult(markdownToHtml(text));
+      }
+      toast.success('Conversion complete');
+    } catch (err) {
+      toast.error('Conversion failed — check your file format');
+      console.error(err);
+    }
+    setIsProcessing(false);
+  }, [dataConversion]);
 
   const handleDownload = useCallback((file: ProcessedFile) => {
     if (file.processedBlob) {
@@ -86,8 +170,7 @@ export default function FormatConverter() {
         }
       });
       const blob = await zip.generateAsync({ type: 'blob' });
-      downloadBlob(blob, `converted-images${mimeToExtension(targetFormat)}.zip`);
-      toast.success('ZIP downloaded!');
+      downloadBlob(blob, 'converted.zip');
     }
   }, [files, handleDownload, targetFormat]);
 
@@ -97,6 +180,8 @@ export default function FormatConverter() {
       if (f.processedUrl) URL.revokeObjectURL(f.processedUrl);
     });
     setFiles([]);
+    setDataResult(null);
+    setDocResult(null);
   }, [files]);
 
   useEffect(() => {
@@ -109,155 +194,332 @@ export default function FormatConverter() {
   }, []);
 
   const doneFiles = files.filter(f => f.status === 'done');
-  const currentFormatLabel = FORMAT_OPTIONS.find(f => f.value === targetFormat)?.label || 'Unknown';
+  const currentFormatLabel = IMAGE_FORMAT_OPTIONS.find(f => f.value === targetFormat)?.label || targetFormat;
+  const selectedDocConv = DOC_CONVERSIONS.find(c => c.id === docConversion)!;
+  const selectedDataConv = DATA_CONVERSIONS.find(c => c.id === dataConversion)!;
 
   return (
     <ToolLayout
       title="Format Converter"
-      description="Convert images between JPEG, PNG, and WebP formats instantly. Batch processing supported."
-      gradient="from-blue-500 to-cyan-600"
+      description="Convert between image, document, and data formats. Everything runs locally."
     >
-      {files.length === 0 ? (
-        <DropZone
-          accept="image/jpeg,image/png,image/webp"
-          multiple
-          onFilesSelected={handleFilesSelected}
-          label="Drop images to convert"
-          sublabel="Supports JPEG, PNG, WebP • Up to 50MB each"
-        />
-      ) : (
-        <div className="space-y-6">
-          {/* Controls */}
-          <div className="card p-6">
-            <div className="flex flex-col gap-5">
-              {/* Target format */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
-                  Convert to:
-                </label>
-                <div className="flex gap-3 flex-wrap">
-                  {FORMAT_OPTIONS.map(format => (
-                    <button
-                      key={format.value}
-                      onClick={() => setTargetFormat(format.value as ConversionOptions['format'])}
-                      className={`px-5 py-3 rounded-xl text-sm font-semibold transition-all duration-200
-                        ${targetFormat === format.value
-                          ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/25'
-                          : 'bg-gray-100 dark:bg-white/10 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/15'
-                        }`}
-                    >
-                      <span className="block">{format.label}</span>
-                      <span className="block text-xs opacity-70 mt-0.5">{format.description}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
+      {/* Category tabs */}
+      <div
+        className="flex gap-1 p-1 rounded-lg mb-6"
+        style={{ backgroundColor: 'var(--color-bg-tertiary)' }}
+      >
+        {(Object.entries(CATEGORIES) as [ConversionCategory, CategoryConfig][]).map(([key, cfg]) => (
+          <button
+            key={key}
+            onClick={() => { setCategory(key); clearAll(); }}
+            className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md flex-1 justify-center transition-all duration-150
+              ${category === key
+                ? 'bg-[var(--color-bg)] shadow-sm'
+                : 'hover:bg-[var(--color-bg)]'
+              }`}
+            style={{ color: category === key ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)' }}
+          >
+            {cfg.icon}
+            <span className="hidden sm:inline">{cfg.label}</span>
+          </button>
+        ))}
+      </div>
 
-              {/* Quality slider (for JPEG and WebP) */}
-              {targetFormat !== 'image/png' && (
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                    Quality: {quality}%
-                  </label>
-                  <input
-                    type="range"
-                    min={10}
-                    max={100}
-                    value={quality}
-                    onChange={e => setQuality(Number(e.target.value))}
-                    className="w-full h-2 bg-gray-200 dark:bg-white/10 rounded-full appearance-none cursor-pointer
-                               [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:h-5
-                               [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-blue-500
-                               [&::-webkit-slider-thumb]:shadow-lg [&::-webkit-slider-thumb]:cursor-pointer"
-                  />
-                </div>
-              )}
-
-              <div className="flex gap-3">
-                <button onClick={processFiles} disabled={isProcessing} className="btn-primary">
-                  <Sparkles className="w-4 h-4" />
-                  {isProcessing ? 'Converting...' : `Convert to ${currentFormatLabel}`}
-                </button>
-                <button onClick={clearAll} className="btn-ghost text-red-500">
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Download all */}
-          <AnimatePresence>
-            {doneFiles.length > 0 && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                className="flex justify-center"
-              >
-                <button onClick={handleDownloadAll} className="btn-primary">
-                  <Download className="w-4 h-4" />
-                  Download {doneFiles.length > 1 ? 'All (ZIP)' : 'Image'}
-                </button>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {/* File list */}
-          <div className="space-y-3">
-            {files.map((file, index) => {
-              const originalExt = file.originalFile.name.split('.').pop()?.toUpperCase() || '?';
-              return (
-                <motion.div
-                  key={file.id}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: index * 0.05 }}
-                  className="card p-4"
-                >
-                  <div className="flex items-center gap-4">
-                    <img
-                      src={file.originalUrl}
-                      alt={file.originalFile.name}
-                      className="w-14 h-14 rounded-lg object-cover border border-gray-200 dark:border-white/10"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate text-gray-900 dark:text-white">
-                        {file.originalFile.name}
-                      </p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className="text-xs px-2 py-0.5 rounded bg-gray-100 dark:bg-white/10 font-mono">
-                          {originalExt}
-                        </span>
-                        <ArrowRight className="w-3 h-3 text-gray-400" />
-                        <span className={`text-xs px-2 py-0.5 rounded font-mono ${
-                          file.status === 'done'
-                            ? 'bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400'
-                            : 'bg-gray-100 dark:bg-white/10'
-                        }`}>
-                          {currentFormatLabel}
-                        </span>
-                        {file.processedSize && (
-                          <span className="text-xs text-gray-400 ml-2">
-                            {formatFileSize(file.originalSize)} → {formatFileSize(file.processedSize)}
-                          </span>
-                        )}
-                      </div>
+      {/* === IMAGE CATEGORY === */}
+      {category === 'image' && (
+        <>
+          {files.length === 0 ? (
+            <DropZone
+              accept="image/jpeg,image/png,image/webp,image/gif,image/svg+xml,image/bmp"
+              multiple
+              onFilesSelected={handleFilesSelected}
+              label="Drop images to convert"
+              sublabel="Supports JPEG, PNG, WebP, GIF, SVG, BMP"
+            />
+          ) : (
+            <div className="space-y-4">
+              {/* Controls */}
+              <div className="card p-4">
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-medium mb-2" style={{ color: 'var(--color-text-secondary)' }}>
+                      Convert to
+                    </label>
+                    <div className="flex gap-2 flex-wrap">
+                      {IMAGE_FORMAT_OPTIONS.map(format => (
+                        <button
+                          key={format.value}
+                          onClick={() => setTargetFormat(format.value)}
+                          className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-150 border
+                            ${targetFormat === format.value
+                              ? 'border-[var(--color-accent)] bg-[var(--color-accent-muted)]'
+                              : 'border-[var(--color-border)] hover:border-[var(--color-text-tertiary)]'
+                            }`}
+                          style={{
+                            color: targetFormat === format.value ? 'var(--color-accent)' : 'var(--color-text-secondary)',
+                          }}
+                        >
+                          {format.label}
+                        </button>
+                      ))}
                     </div>
+                  </div>
 
-                    <div className="flex items-center gap-2">
+                  {targetFormat !== 'image/png' && (
+                    <div>
+                      <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--color-text-secondary)' }}>
+                        Quality: {quality}%
+                      </label>
+                      <input
+                        type="range"
+                        min={10}
+                        max={100}
+                        value={quality}
+                        onChange={e => setQuality(Number(e.target.value))}
+                        className="w-full h-1.5 rounded-full appearance-none cursor-pointer accent-[var(--color-accent)]"
+                        style={{ backgroundColor: 'var(--color-bg-tertiary)' }}
+                      />
+                    </div>
+                  )}
+
+                  <div className="flex gap-2">
+                    <button onClick={processImageFiles} disabled={isProcessing} className="btn-primary">
+                      {isProcessing ? 'Converting...' : `Convert to ${currentFormatLabel}`}
+                    </button>
+                    {doneFiles.length > 0 && (
+                      <button onClick={handleDownloadAll} className="btn-secondary">
+                        <Download className="w-4 h-4" />
+                        {doneFiles.length > 1 ? 'Download All' : 'Download'}
+                      </button>
+                    )}
+                    <button onClick={clearAll} className="btn-ghost p-2 ml-auto text-red-500">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* File list */}
+              <div className="border rounded-lg divide-y" style={{ borderColor: 'var(--color-border)' }}>
+                {files.map((file) => {
+                  const originalExt = file.originalFile.name.split('.').pop()?.toUpperCase() || '?';
+                  return (
+                    <div key={file.id} className="flex items-center gap-3 px-4 py-3">
+                      <img
+                        src={file.originalUrl}
+                        alt=""
+                        className="w-10 h-10 rounded object-cover border"
+                        style={{ borderColor: 'var(--color-border)' }}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate" style={{ color: 'var(--color-text-primary)' }}>
+                          {file.originalFile.name}
+                        </p>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <span className="text-xs font-mono px-1.5 py-0.5 rounded" style={{ backgroundColor: 'var(--color-bg-tertiary)', color: 'var(--color-text-tertiary)' }}>
+                            {originalExt}
+                          </span>
+                          <ArrowRight className="w-3 h-3" style={{ color: 'var(--color-text-tertiary)' }} />
+                          <span
+                            className="text-xs font-mono px-1.5 py-0.5 rounded"
+                            style={{
+                              backgroundColor: file.status === 'done' ? 'var(--color-accent-muted)' : 'var(--color-bg-tertiary)',
+                              color: file.status === 'done' ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
+                            }}
+                          >
+                            {currentFormatLabel}
+                          </span>
+                          {file.processedSize != null && (
+                            <span className="text-xs ml-1" style={{ color: 'var(--color-text-tertiary)' }}>
+                              {formatFileSize(file.originalSize)} → {formatFileSize(file.processedSize)}
+                            </span>
+                          )}
+                        </div>
+                      </div>
                       {file.status === 'done' && (
                         <button onClick={() => handleDownload(file)} className="btn-ghost p-2">
                           <Download className="w-4 h-4" />
                         </button>
                       )}
                       {file.status === 'processing' && (
-                        <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                        <div className="w-4 h-4 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: 'var(--color-accent)', borderTopColor: 'transparent' }} />
                       )}
                     </div>
-                  </div>
-                </motion.div>
-              );
-            })}
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* === DOCUMENT CATEGORY === */}
+      {category === 'document' && (
+        <div className="space-y-4">
+          {/* Conversion type selector */}
+          <div>
+            <label className="block text-xs font-medium mb-2" style={{ color: 'var(--color-text-secondary)' }}>
+              Conversion type
+            </label>
+            <div className="flex gap-2 flex-wrap">
+              {DOC_CONVERSIONS.map(conv => (
+                <button
+                  key={conv.id}
+                  onClick={() => { setDocConversion(conv.id); setDocResult(null); }}
+                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-150 border
+                    ${docConversion === conv.id
+                      ? 'border-[var(--color-accent)] bg-[var(--color-accent-muted)]'
+                      : 'border-[var(--color-border)] hover:border-[var(--color-text-tertiary)]'
+                    }`}
+                  style={{
+                    color: docConversion === conv.id ? 'var(--color-accent)' : 'var(--color-text-secondary)',
+                  }}
+                >
+                  {conv.label}
+                </button>
+              ))}
+            </div>
           </div>
+
+          {!docResult ? (
+            <DropZone
+              accept={selectedDocConv.accept}
+              multiple={selectedDocConv.multiple}
+              onFilesSelected={(f) => processDocFiles(f)}
+              label={`Drop ${selectedDocConv.label.split(' → ')[0].toLowerCase()} files`}
+              sublabel={isProcessing ? 'Processing...' : undefined}
+            />
+          ) : (
+            <div className="space-y-3">
+              <div className="card p-4">
+                <p className="text-sm font-medium mb-3" style={{ color: 'var(--color-text-primary)' }}>
+                  {docResult.blobs.length} file{docResult.blobs.length > 1 ? 's' : ''} ready
+                </p>
+                <div className="flex gap-2 flex-wrap">
+                  {docResult.blobs.map((blob, i) => (
+                    <button
+                      key={i}
+                      onClick={() => downloadBlob(blob, docResult.names[i])}
+                      className="btn-secondary text-sm"
+                    >
+                      <Download className="w-4 h-4" />
+                      {docResult.names[i]}
+                    </button>
+                  ))}
+                  {docResult.blobs.length > 1 && (
+                    <button
+                      onClick={async () => {
+                        const JSZip = (await import('jszip')).default;
+                        const zip = new JSZip();
+                        docResult.blobs.forEach((b, i) => zip.file(docResult.names[i], b));
+                        const blob = await zip.generateAsync({ type: 'blob' });
+                        downloadBlob(blob, 'converted.zip');
+                      }}
+                      className="btn-primary text-sm"
+                    >
+                      <Download className="w-4 h-4" />
+                      Download All (ZIP)
+                    </button>
+                  )}
+                </div>
+              </div>
+              <button onClick={clearAll} className="btn-ghost text-sm text-red-500">
+                <Trash2 className="w-4 h-4" />
+                Clear
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* === DATA CATEGORY === */}
+      {category === 'data' && (
+        <div className="space-y-4">
+          {/* Conversion type selector */}
+          <div>
+            <label className="block text-xs font-medium mb-2" style={{ color: 'var(--color-text-secondary)' }}>
+              Conversion type
+            </label>
+            <div className="flex gap-2 flex-wrap">
+              {DATA_CONVERSIONS.map(conv => (
+                <button
+                  key={conv.id}
+                  onClick={() => { setDataConversion(conv.id); setDataResult(null); }}
+                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-150 border
+                    ${dataConversion === conv.id
+                      ? 'border-[var(--color-accent)] bg-[var(--color-accent-muted)]'
+                      : 'border-[var(--color-border)] hover:border-[var(--color-text-tertiary)]'
+                    }`}
+                  style={{
+                    color: dataConversion === conv.id ? 'var(--color-accent)' : 'var(--color-text-secondary)',
+                  }}
+                >
+                  {conv.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {!dataResult ? (
+            <DropZone
+              accept={selectedDataConv.accept}
+              onFilesSelected={(f) => processDataFile(f)}
+              label={selectedDataConv.inputLabel}
+              sublabel={isProcessing ? 'Processing...' : undefined}
+            />
+          ) : (
+            <div className="space-y-3">
+              <div className="card p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>
+                    Result
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(dataResult);
+                        toast.success('Copied to clipboard');
+                      }}
+                      className="btn-ghost text-xs"
+                    >
+                      Copy
+                    </button>
+                    <button
+                      onClick={() => {
+                        const ext = dataConversion === 'json-to-csv' ? '.csv'
+                          : dataConversion === 'csv-to-json' ? '.json'
+                          : '.html';
+                        const mime = dataConversion === 'json-to-csv' ? 'text/csv'
+                          : dataConversion === 'csv-to-json' ? 'application/json'
+                          : 'text/html';
+                        const blob = new Blob([dataResult], { type: mime });
+                        downloadBlob(blob, `converted${ext}`);
+                      }}
+                      className="btn-ghost text-xs"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      Download
+                    </button>
+                  </div>
+                </div>
+                <textarea
+                  ref={resultRef}
+                  readOnly
+                  value={dataResult}
+                  className="w-full h-64 font-mono text-xs p-3 rounded-lg border resize-none"
+                  style={{
+                    backgroundColor: 'var(--color-bg)',
+                    borderColor: 'var(--color-border)',
+                    color: 'var(--color-text-primary)',
+                  }}
+                />
+              </div>
+              <button onClick={clearAll} className="btn-ghost text-sm text-red-500">
+                <Trash2 className="w-4 h-4" />
+                Clear
+              </button>
+            </div>
+          )}
         </div>
       )}
     </ToolLayout>

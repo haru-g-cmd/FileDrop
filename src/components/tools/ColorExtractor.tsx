@@ -1,5 +1,4 @@
 import { useState, useCallback, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import { Copy, Check, RefreshCw, Download, Trash2 } from 'lucide-react';
 import ToolLayout from '../shared/ToolLayout';
 import DropZone from '../shared/DropZone';
@@ -126,7 +125,6 @@ export default function ColorExtractor() {
     <ToolLayout
       title="Color Extractor"
       description="Extract dominant color palettes from any image. Get hex codes, RGB values, and downloadable palette images."
-      gradient="from-pink-500 to-rose-600"
     >
       {!imageUrl ? (
         <DropZone
@@ -141,7 +139,7 @@ export default function ColorExtractor() {
           <div className="card overflow-hidden">
             <div className="grid md:grid-cols-2">
               {/* Image */}
-              <div className="aspect-square bg-gray-50 dark:bg-black/20 flex items-center justify-center p-4">
+              <div className="aspect-square flex items-center justify-center p-4" style={{ backgroundColor: 'var(--color-bg-tertiary)' }}>
                 <img
                   src={imageUrl}
                   alt="Source"
@@ -152,7 +150,7 @@ export default function ColorExtractor() {
               {/* Color palette */}
               <div className="p-6 flex flex-col">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                  <h3 className="text-sm font-semibold" style={{ color: 'var(--color-text-secondary)' }}>
                     Extracted Colors ({colors.length})
                   </h3>
                   <div className="flex gap-2">
@@ -164,7 +162,7 @@ export default function ColorExtractor() {
 
                 {/* Color count slider */}
                 <div className="mb-4">
-                  <label className="block text-xs text-gray-500 mb-1">Colors: {colorCount}</label>
+                  <label className="block text-xs mb-1" style={{ color: 'var(--color-text-secondary)' }}>Colors: {colorCount}</label>
                   <div className="flex items-center gap-3">
                     <input
                       type="range"
@@ -172,10 +170,11 @@ export default function ColorExtractor() {
                       max={16}
                       value={colorCount}
                       onChange={e => setColorCount(Number(e.target.value))}
-                      className="flex-1 h-1.5 bg-gray-200 dark:bg-white/10 rounded-full appearance-none cursor-pointer
+                      className="flex-1 h-1.5 rounded-full appearance-none cursor-pointer
                                  [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4
-                                 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-pink-500
-                                 [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:cursor-pointer"
+                                 [&::-webkit-slider-thumb]:rounded-full
+                                 [&::-webkit-slider-thumb]:cursor-pointer"
+                      style={{ backgroundColor: 'var(--color-bg-tertiary)' }}
                     />
                     <button
                       onClick={reExtract}
@@ -190,39 +189,33 @@ export default function ColorExtractor() {
 
                 {/* Color swatches */}
                 <div className="flex-1 space-y-2 overflow-y-auto scrollbar-thin max-h-80">
-                  <AnimatePresence mode="popLayout">
-                    {colors.map((color, index) => (
-                      <motion.div
-                        key={`${color.hex}-${index}`}
-                        initial={{ opacity: 0, scale: 0.9 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.9 }}
-                        transition={{ delay: index * 0.05 }}
-                        className="flex items-center gap-3 p-2 rounded-xl hover:bg-gray-50 dark:hover:bg-white/5 group cursor-pointer"
-                        onClick={() => handleCopy(color.hex, index)}
-                      >
-                        <div
-                          className="w-10 h-10 rounded-lg shadow-sm border border-black/10 flex-shrink-0"
-                          style={{ backgroundColor: color.hex }}
-                        />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-mono font-semibold text-gray-800 dark:text-gray-200">
-                            {color.hex.toUpperCase()}
-                          </p>
-                          <p className="text-xs text-gray-400">
-                            {color.name} • {color.percentage}%
-                          </p>
-                        </div>
-                        <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-                          {copiedIndex === index ? (
-                            <Check className="w-4 h-4 text-green-500" />
-                          ) : (
-                            <Copy className="w-4 h-4 text-gray-400" />
-                          )}
-                        </div>
-                      </motion.div>
-                    ))}
-                  </AnimatePresence>
+                  {colors.map((color, index) => (
+                    <div
+                      key={`${color.hex}-${index}`}
+                      className="flex items-center gap-3 p-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 group cursor-pointer"
+                      onClick={() => handleCopy(color.hex, index)}
+                    >
+                      <div
+                        className="w-10 h-10 rounded-lg shadow-sm flex-shrink-0"
+                        style={{ backgroundColor: color.hex, border: '1px solid rgba(0,0,0,0.1)' }}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-mono font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+                          {color.hex.toUpperCase()}
+                        </p>
+                        <p className="text-xs" style={{ color: 'var(--color-text-tertiary)' }}>
+                          {color.name} • {color.percentage}%
+                        </p>
+                      </div>
+                      <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                        {copiedIndex === index ? (
+                          <Check className="w-4 h-4 text-green-500" />
+                        ) : (
+                          <Copy className="w-4 h-4" style={{ color: 'var(--color-text-tertiary)' }} />
+                        )}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
@@ -231,12 +224,12 @@ export default function ColorExtractor() {
           {/* Gradient preview */}
           {cssGradient && (
             <div className="card p-6">
-              <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+              <h3 className="text-sm font-semibold mb-3" style={{ color: 'var(--color-text-secondary)' }}>
                 Generated Gradient
               </h3>
               <div
-                className="h-16 rounded-xl border border-gray-200 dark:border-white/10"
-                style={{ background: cssGradient }}
+                className="h-16 rounded-lg"
+                style={{ background: cssGradient, borderWidth: '1px', borderStyle: 'solid', borderColor: 'var(--color-border)' }}
               />
               <button
                 onClick={() => { copyToClipboard(cssGradient); toast.success('CSS gradient copied!'); }}
@@ -251,7 +244,7 @@ export default function ColorExtractor() {
           {/* Color details & actions */}
           <div className="card p-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+              <h3 className="text-sm font-semibold" style={{ color: 'var(--color-text-secondary)' }}>
                 Color Values
               </h3>
               <button onClick={downloadPalette} className="btn-secondary text-sm">
@@ -263,7 +256,7 @@ export default function ColorExtractor() {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="text-left text-xs text-gray-400 border-b border-gray-100 dark:border-white/5">
+                  <tr className="text-left text-xs" style={{ color: 'var(--color-text-tertiary)', borderBottomWidth: '1px', borderBottomStyle: 'solid', borderBottomColor: 'var(--color-border)' }}>
                     <th className="pb-2 font-medium">Color</th>
                     <th className="pb-2 font-medium">HEX</th>
                     <th className="pb-2 font-medium">RGB</th>
@@ -273,14 +266,15 @@ export default function ColorExtractor() {
                 </thead>
                 <tbody>
                   {colors.map((color, i) => (
-                    <tr key={i} className="border-b border-gray-50 dark:border-white/5 last:border-0">
+                    <tr key={i} style={{ borderBottomWidth: '1px', borderBottomStyle: 'solid', borderBottomColor: 'var(--color-border)' }}>
                       <td className="py-2.5">
-                        <div className="w-6 h-6 rounded-md border border-black/10" style={{ backgroundColor: color.hex }} />
+                        <div className="w-6 h-6 rounded-md" style={{ backgroundColor: color.hex, border: '1px solid rgba(0,0,0,0.1)' }} />
                       </td>
                       <td className="py-2.5">
                         <button
                           onClick={() => handleCopy(color.hex, i + 100)}
-                          className="font-mono text-xs hover:text-pink-500 transition-colors"
+                          className="font-mono text-xs transition-colors"
+                          style={{ color: 'var(--color-text-primary)' }}
                         >
                           {color.hex.toUpperCase()}
                         </button>
@@ -288,13 +282,14 @@ export default function ColorExtractor() {
                       <td className="py-2.5">
                         <button
                           onClick={() => handleCopy(`rgb(${color.rgb.r}, ${color.rgb.g}, ${color.rgb.b})`, i + 200)}
-                          className="font-mono text-xs text-gray-500 hover:text-pink-500 transition-colors"
+                          className="font-mono text-xs transition-colors"
+                          style={{ color: 'var(--color-text-secondary)' }}
                         >
                           {color.rgb.r}, {color.rgb.g}, {color.rgb.b}
                         </button>
                       </td>
-                      <td className="py-2.5 text-xs text-gray-500">{color.name}</td>
-                      <td className="py-2.5 text-right text-xs font-medium">{color.percentage}%</td>
+                      <td className="py-2.5 text-xs" style={{ color: 'var(--color-text-secondary)' }}>{color.name}</td>
+                      <td className="py-2.5 text-right text-xs font-medium" style={{ color: 'var(--color-text-primary)' }}>{color.percentage}%</td>
                     </tr>
                   ))}
                 </tbody>

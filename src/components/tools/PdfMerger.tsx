@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
-import { motion, AnimatePresence, Reorder } from 'framer-motion';
-import { Download, Trash2, GripVertical, FileText, Sparkles, Plus } from 'lucide-react';
+import { Reorder } from 'framer-motion';
+import { Download, Trash2, GripVertical, FileText, Plus } from 'lucide-react';
 import ToolLayout from '../shared/ToolLayout';
 import DropZone from '../shared/DropZone';
 import { mergePdfs, getPdfPageCount } from '../../utils/pdfUtils';
@@ -90,7 +90,6 @@ export default function PdfMerger() {
     <ToolLayout
       title="PDF Merger"
       description="Combine multiple PDF files into a single document. Drag to reorder pages before merging."
-      gradient="from-orange-500 to-amber-600"
     >
       {pdfFiles.length === 0 ? (
         <DropZone
@@ -107,16 +106,16 @@ export default function PdfMerger() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="flex gap-6">
                 <div>
-                  <p className="text-xs text-gray-500">Files</p>
-                  <p className="text-lg font-bold text-gray-900 dark:text-white">{pdfFiles.length}</p>
+                  <p className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>Files</p>
+                  <p className="text-lg font-bold" style={{ color: 'var(--color-text-primary)' }}>{pdfFiles.length}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500">Total Pages</p>
-                  <p className="text-lg font-bold text-gray-900 dark:text-white">{totalPages}</p>
+                  <p className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>Total Pages</p>
+                  <p className="text-lg font-bold" style={{ color: 'var(--color-text-primary)' }}>{totalPages}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500">Total Size</p>
-                  <p className="text-lg font-bold text-gray-900 dark:text-white">{formatFileSize(totalSize)}</p>
+                  <p className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>Total Size</p>
+                  <p className="text-lg font-bold" style={{ color: 'var(--color-text-primary)' }}>{formatFileSize(totalSize)}</p>
                 </div>
               </div>
 
@@ -126,7 +125,6 @@ export default function PdfMerger() {
                   disabled={isProcessing || pdfFiles.length < 2}
                   className="btn-primary"
                 >
-                  <Sparkles className="w-4 h-4" />
                   {isProcessing ? 'Merging...' : 'Merge PDFs'}
                 </button>
                 <button onClick={clearAll} className="btn-ghost text-red-500">
@@ -136,7 +134,7 @@ export default function PdfMerger() {
             </div>
 
             {/* Add more */}
-            <div className="mt-4 pt-4 border-t border-gray-100 dark:border-white/5">
+            <div className="mt-4 pt-4" style={{ borderTopWidth: '1px', borderTopStyle: 'solid', borderTopColor: 'var(--color-border)' }}>
               <button
                 onClick={() => {
                   const input = document.createElement('input');
@@ -158,33 +156,30 @@ export default function PdfMerger() {
           </div>
 
           {/* Download result */}
-          <AnimatePresence>
-            {mergedBlob && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="card p-6 text-center bg-gradient-to-br from-orange-50 to-amber-50 dark:from-orange-500/5 dark:to-amber-500/5"
+          {mergedBlob && (
+            <div className="card p-6 text-center" style={{ backgroundColor: 'var(--color-bg-tertiary)' }}>
+              <div
+                className="inline-flex items-center justify-center w-14 h-14 rounded-lg mb-3"
+                style={{ backgroundColor: 'var(--color-accent-muted)' }}
               >
-                <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-orange-100 dark:bg-orange-500/20 mb-3">
-                  <FileText className="w-7 h-7 text-orange-500" />
-                </div>
-                <p className="text-sm font-semibold text-gray-900 dark:text-white mb-1">
-                  Merge Complete!
-                </p>
-                <p className="text-xs text-gray-500 mb-4">
-                  {totalPages} pages • {formatFileSize(mergedBlob.size)}
-                </p>
-                <button onClick={handleDownload} className="btn-primary">
-                  <Download className="w-4 h-4" />
-                  Download Merged PDF
-                </button>
-              </motion.div>
-            )}
-          </AnimatePresence>
+                <FileText className="w-7 h-7" style={{ color: 'var(--color-accent)' }} />
+              </div>
+              <p className="text-sm font-semibold mb-1" style={{ color: 'var(--color-text-primary)' }}>
+                Merge Complete!
+              </p>
+              <p className="text-xs mb-4" style={{ color: 'var(--color-text-secondary)' }}>
+                {totalPages} pages • {formatFileSize(mergedBlob.size)}
+              </p>
+              <button onClick={handleDownload} className="btn-primary">
+                <Download className="w-4 h-4" />
+                Download Merged PDF
+              </button>
+            </div>
+          )}
 
           {/* Reorderable file list */}
           <div>
-            <p className="text-xs text-gray-400 mb-3 flex items-center gap-1.5">
+            <p className="text-xs mb-3 flex items-center gap-1.5" style={{ color: 'var(--color-text-tertiary)' }}>
               <GripVertical className="w-3.5 h-3.5" />
               Drag to reorder before merging
             </p>
@@ -197,32 +192,30 @@ export default function PdfMerger() {
             >
               {pdfFiles.map((pdf, index) => (
                 <Reorder.Item key={pdf.id} value={pdf}>
-                  <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.05 }}
-                    className="card p-4 cursor-grab active:cursor-grabbing"
-                  >
+                  <div className="card p-4 cursor-grab active:cursor-grabbing">
                     <div className="flex items-center gap-4">
                       <div className="flex items-center gap-3">
-                        <GripVertical className="w-4 h-4 text-gray-300 dark:text-gray-600" />
-                        <div className="w-10 h-10 rounded-lg bg-orange-100 dark:bg-orange-500/20 flex items-center justify-center flex-shrink-0">
-                          <span className="text-sm font-bold text-orange-600 dark:text-orange-400">
+                        <GripVertical className="w-4 h-4" style={{ color: 'var(--color-text-tertiary)' }} />
+                        <div
+                          className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
+                          style={{ backgroundColor: 'var(--color-accent-muted)' }}
+                        >
+                          <span className="text-sm font-bold" style={{ color: 'var(--color-accent)' }}>
                             {index + 1}
                           </span>
                         </div>
                       </div>
 
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate text-gray-900 dark:text-white">
+                        <p className="text-sm font-medium truncate" style={{ color: 'var(--color-text-primary)' }}>
                           {pdf.file.name}
                         </p>
                         <div className="flex items-center gap-3 mt-0.5">
-                          <span className="text-xs text-gray-400">{formatFileSize(pdf.file.size)}</span>
+                          <span className="text-xs" style={{ color: 'var(--color-text-tertiary)' }}>{formatFileSize(pdf.file.size)}</span>
                           {pdf.isLoadingPages ? (
-                            <span className="text-xs text-gray-400">Loading...</span>
+                            <span className="text-xs" style={{ color: 'var(--color-text-tertiary)' }}>Loading...</span>
                           ) : pdf.pageCount !== null ? (
-                            <span className="text-xs text-gray-400">
+                            <span className="text-xs" style={{ color: 'var(--color-text-tertiary)' }}>
                               {pdf.pageCount} page{pdf.pageCount !== 1 ? 's' : ''}
                             </span>
                           ) : null}
@@ -236,7 +229,7 @@ export default function PdfMerger() {
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
-                  </motion.div>
+                  </div>
                 </Reorder.Item>
               ))}
             </Reorder.Group>

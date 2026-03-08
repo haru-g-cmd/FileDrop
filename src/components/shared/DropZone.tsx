@@ -1,6 +1,5 @@
 import { useCallback, useState, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Upload, FileImage, X, AlertCircle } from 'lucide-react';
+import { Upload, AlertCircle, X } from 'lucide-react';
 import { formatFileSize } from '../../utils/fileUtils';
 import { MAX_FILE_SIZE } from '../../constants';
 
@@ -33,26 +32,32 @@ export default function DropZone({
   const validateFiles = useCallback((files: FileList | File[]): File[] => {
     const fileArray = Array.from(files);
     const acceptedTypes = accept.split(',').map(t => t.trim());
-    
+
+    // If accept is empty or *, accept all
+    if (!accept || accept === '*/*') return fileArray.slice(0, maxFiles);
+
     const valid: File[] = [];
     for (const file of fileArray) {
       if (file.size > MAX_FILE_SIZE) {
         setError(`${file.name} is too large (max ${formatFileSize(MAX_FILE_SIZE)})`);
         continue;
       }
-      
+
       const matchesType = acceptedTypes.some(type => {
         if (type.endsWith('/*')) {
           return file.type.startsWith(type.replace('/*', '/'));
         }
+        if (type.startsWith('.')) {
+          return file.name.toLowerCase().endsWith(type.toLowerCase());
+        }
         return file.type === type;
       });
-      
+
       if (!matchesType) {
         setError(`${file.name} is not a supported format`);
         continue;
       }
-      
+
       valid.push(file);
     }
 
@@ -106,7 +111,6 @@ export default function DropZone({
         onFilesSelected(files);
       }
     }
-    // Reset input so same file can be selected again
     e.target.value = '';
   }, [validateFiles, onFilesSelected]);
 
@@ -117,8 +121,13 @@ export default function DropZone({
         'image/jpeg': 'JPG',
         'image/png': 'PNG',
         'image/webp': 'WebP',
+        'image/gif': 'GIF',
         'image/svg+xml': 'SVG',
+        'image/bmp': 'BMP',
         'application/pdf': 'PDF',
+        'image/*': 'Images',
+        '*/*': 'Any file',
+        'text/plain': 'TXT',
       };
       return map[t.trim()] || t.trim();
     })
@@ -126,22 +135,20 @@ export default function DropZone({
 
   return (
     <div className={className}>
-      <motion.div
+      <div
         onDragEnter={handleDragEnter}
         onDragLeave={handleDragLeave}
         onDragOver={handleDragOver}
         onDrop={handleDrop}
         onClick={() => fileInputRef.current?.click()}
         className={`
-          relative cursor-pointer rounded-2xl border-2 border-dashed p-12
-          transition-all duration-300 ease-out
+          relative cursor-pointer rounded-lg border-2 border-dashed p-8
+          transition-colors duration-200
           ${isDragging
-            ? 'border-brand-500 bg-brand-500/5 dark:bg-brand-500/10 scale-[1.02]'
-            : 'border-gray-300 dark:border-gray-600 hover:border-brand-400 hover:bg-gray-50 dark:hover:bg-white/5'
+            ? 'border-[var(--color-accent)] bg-[var(--color-accent-muted)]'
+            : 'border-[var(--color-border)] hover:border-[var(--color-text-tertiary)]'
           }
         `}
-        whileHover={{ scale: 1.01 }}
-        whileTap={{ scale: 0.99 }}
       >
         <input
           ref={fileInputRef}
@@ -152,61 +159,34 @@ export default function DropZone({
           className="hidden"
         />
 
-        <div className="flex flex-col items-center gap-4 text-center">
-          <motion.div
-            animate={isDragging ? { scale: 1.2, y: -10 } : { scale: 1, y: 0 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-            className={`
-              p-4 rounded-2xl
-              ${isDragging
-                ? 'bg-brand-500/10 text-brand-500'
-                : 'bg-gray-100 dark:bg-white/10 text-gray-400 dark:text-gray-500'
-              }
-            `}
+        <div className="flex flex-col items-center gap-3 text-center">
+          <div
+            className="p-3 rounded-lg"
+            style={{ backgroundColor: 'var(--color-bg-tertiary)' }}
           >
-            {icon || (isDragging ? <FileImage className="w-10 h-10" /> : <Upload className="w-10 h-10" />)}
-          </motion.div>
-
+            {icon || <Upload className="w-6 h-6" style={{ color: 'var(--color-text-tertiary)' }} />}
+          </div>
           <div>
-            <p className="text-lg font-semibold text-gray-700 dark:text-gray-200">
+            <p className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
               {isDragging ? 'Release to upload' : label}
             </p>
-            <p className="mt-1 text-sm text-gray-400 dark:text-gray-500">
-              {sublabel || `Supports ${acceptExtensions} • Max ${formatFileSize(MAX_FILE_SIZE)}`}
+            <p className="mt-1 text-xs" style={{ color: 'var(--color-text-tertiary)' }}>
+              {sublabel || `Supports ${acceptExtensions} · Max ${formatFileSize(MAX_FILE_SIZE)}`}
             </p>
           </div>
         </div>
-
-        {/* Animated border glow on drag */}
-        <AnimatePresence>
-          {isDragging && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="absolute inset-0 rounded-2xl ring-4 ring-brand-500/20 pointer-events-none"
-            />
-          )}
-        </AnimatePresence>
-      </motion.div>
+      </div>
 
       {/* Error message */}
-      <AnimatePresence>
-        {error && (
-          <motion.div
-            initial={{ opacity: 0, y: -10, height: 0 }}
-            animate={{ opacity: 1, y: 0, height: 'auto' }}
-            exit={{ opacity: 0, y: -10, height: 0 }}
-            className="mt-3 flex items-center gap-2 text-sm text-red-500"
-          >
-            <AlertCircle className="w-4 h-4 flex-shrink-0" />
-            <span>{error}</span>
-            <button onClick={(e) => { e.stopPropagation(); setError(null); }} className="ml-auto">
-              <X className="w-4 h-4" />
-            </button>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {error && (
+        <div className="mt-2 flex items-center gap-2 text-xs text-red-500">
+          <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+          <span>{error}</span>
+          <button onClick={(e) => { e.stopPropagation(); setError(null); }} className="ml-auto">
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
     </div>
   );
 }
